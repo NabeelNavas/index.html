@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SupportAI — Triage Agent</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b0f; --surface: #111318; --surface2: #181c24;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+    --text: #f0f0f0; --muted: #6b7280;
+    --accent: #6ee7b7; --accent2: #34d399;
+    --red: #f87171; --amber: #fbbf24; --blue: #60a5fa; --purple: #a78bfa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; }
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background-image: linear-gradient(rgba(110,231,183,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(110,231,183,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .key-banner { background: rgba(251,191,36,0.08); border-bottom: 1px solid rgba(251,191,36,0.2); padding: 10px 24px; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--amber); display: flex; align-items: center; gap: 10px; position: relative; z-index: 10; }
+  .key-banner.ok { background: rgba(110,231,183,0.06); border-bottom-color: rgba(110,231,183,0.15); color: var(--accent); }
+  .app { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; }
+  .header { display: flex; align-items: center; gap: 14px; margin-bottom: 48px; }
+  .logo { width: 38px; height: 38px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .header-text h1 { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.3px; }
+  .header-text p { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .status-dot { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--accent); font-family: 'DM Mono', monospace; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .section-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted); letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 10px; }
+  .input-wrapper { background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; overflow: hidden; transition: border-color 0.2s; }
+  .input-wrapper:focus-within { border-color: rgba(110,231,183,0.4); }
+  textarea { width: 100%; background: transparent; border: none; outline: none; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 15px; line-height: 1.7; padding: 18px 20px 14px; resize: none; min-height: 140px; }
+  textarea::placeholder { color: #3d4455; }
+  .input-footer { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-top: 1px solid var(--border); }
+  .char-count { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+  .examples { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 20px; }
+  .pill { background: var(--surface2); border: 1px solid var(--border); border-radius: 20px; padding: 5px 13px; font-size: 12px; color: var(--muted); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .pill:hover { border-color: var(--border2); color: var(--text); background: var(--surface); }
+  .btn { background: var(--accent); color: #0a0b0f; border: none; border-radius: 9px; padding: 8px 18px; font-family: 'Syne', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 7px; }
+  .btn:hover { background: var(--accent2); transform: translateY(-1px); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .pipeline { margin-top: 40px; display: none; }
+  .pipeline.visible { display: block; }
+  .step { display: flex; gap: 16px; margin-bottom: 16px; opacity: 0; transform: translateY(10px); animation: stepIn 0.35s ease forwards; }
+  @keyframes stepIn { to { opacity:1; transform:translateY(0); } }
+  .step-line { display: flex; flex-direction: column; align-items: center; }
+  .step-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; font-family: 'DM Mono', monospace; }
+  .step-connector { flex: 1; width: 1px; background: var(--border2); margin: 4px 0; min-height: 16px; }
+  .step-body { flex: 1; padding-bottom: 4px; }
+  .step-title { font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 6px; letter-spacing: 0.5px; }
+  .step-card { background: var(--surface); border: 1px solid var(--border2); border-radius: 10px; padding: 14px 16px; font-size: 14px; line-height: 1.6; }
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .metric { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .metric-label { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 5px; }
+  .metric-value { font-size: 15px; font-weight: 500; font-family: 'Syne', sans-serif; }
+  .dept-badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 30px; font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; margin-bottom: 14px; }
+  .dept-refunds { background: rgba(248,113,113,0.12); color: var(--red); border: 1px solid rgba(248,113,113,0.25); }
+  .dept-tech { background: rgba(96,165,250,0.12); color: var(--blue); border: 1px solid rgba(96,165,250,0.25); }
+  .dept-sales { background: rgba(167,139,250,0.12); color: var(--purple); border: 1px solid rgba(167,139,250,0.25); }
+  .dept-general { background: rgba(110,231,183,0.12); color: var(--accent); border: 1px solid rgba(110,231,183,0.25); }
+  .sentiment-bar { display: flex; gap: 3px; margin-top: 6px; }
+  .bar-seg { height: 4px; border-radius: 2px; flex: 1; background: var(--border); }
+  .bar-seg.filled-negative { background: var(--red); }
+  .bar-seg.filled-neutral { background: var(--amber); }
+  .bar-seg.filled-positive { background: var(--accent); }
+  .draft-box { background: var(--surface); border: 1px solid rgba(110,231,183,0.2); border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; padding: 16px 18px; font-size: 14px; line-height: 1.7; white-space: pre-wrap; }
+  .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.15); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .thinking { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); font-family: 'DM Mono', monospace; padding: 12px 0; }
+  .error-box { background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.25); border-radius: 10px; padding: 14px 16px; font-size: 14px; color: var(--red); line-height: 1.6; }
+  .reset-btn { background: transparent; border: 1px solid var(--border2); border-radius: 8px; color: var(--muted); font-size: 13px; padding: 7px 16px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; margin-top: 24px; display: block; }
+  .reset-btn:hover { color: var(--text); }
+  @media (max-width: 520px) { .result-grid { grid-template-columns: 1fr; } }
+</style>
+
+<div class="key-banner" id="keyBanner">
+  ⚠ <span>Open this file in a text editor and paste your Gemini API key on line 1 of the script below</span>
+</div>
+
+<div class="app">
+  <div class="header">
+    <div class="logo">⚡</div>
+    <div class="header-text">
+      <h1>SupportAI Triage Agent</h1>
+      <p>powered by Gemini · autonomous · multi-step</p>
+    </div>
+    <div class="status-dot"><div class="dot"></div>LIVE</div>
+  </div>
+
+  <div id="inputSection">
+    <div class="section-label">Customer Message</div>
+    <div class="examples">
+      <span class="pill" onclick="loadExample(0)">😤 Angry refund</span>
+      <span class="pill" onclick="loadExample(1)">🔧 Tech issue</span>
+      <span class="pill" onclick="loadExample(2)">💼 Upgrade query</span>
+      <span class="pill" onclick="loadExample(3)">😊 Happy + question</span>
+    </div>
+    <div class="input-wrapper">
+      <textarea id="msgInput" placeholder="Paste a customer support message here…" oninput="updateCount()"></textarea>
+      <div class="input-footer">
+        <span class="char-count" id="charCount">0 chars</span>
+        <button class="btn" id="analyzeBtn" onclick="runTriage()">
+          <span>Analyze</span><span>→</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pipeline" id="pipeline">
+    <div class="step" id="step1">
+      <div class="step-line">
+        <div class="step-icon" style="background:rgba(110,231,183,0.12);color:var(--accent);">01</div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-body">
+        <div class="step-title">INPUT · CUSTOMER MESSAGE</div>
+        <div class="step-card" id="step1Content" style="color:var(--muted);font-style:italic;"></div>
+      </div>
+    </div>
+    <div class="step" id="step2" style="display:none;">
+      <div class="step-line">
+        <div class="step-icon" style="background:rgba(251,191,36,0.12);color:var(--amber);">02</div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-body">
+        <div class="step-title">TRIAGE AGENT · ANALYSIS</div>
+        <div class="step-card" id="step2Content"><div class="thinking"><div class="spinner"></div>Analyzing sentiment, urgency & intent…</div></div>
+      </div>
+    </div>
+    <div class="step" id="step3" style="display:none;">
+      <div class="step-line">
+        <div class="step-icon" style="background:rgba(96,165,250,0.12);color:var(--blue);">03</div>
+        <div class="step-connector"></div>
+      </div>
+      <div class="step-body">
+        <div class="step-title">ROUTING · DEPARTMENT ASSIGNMENT</div>
+        <div class="step-card" id="step3Content"><div class="thinking"><div class="spinner"></div>Routing to best-fit department…</div></div>
+      </div>
+    </div>
+    <div class="step" id="step4" style="display:none;">
+      <div class="step-line">
+        <div class="step-icon" style="background:rgba(167,139,250,0.12);color:var(--purple);">04</div>
+      </div>
+      <div class="step-body">
+        <div class="step-title">RESPONSE AGENT · DRAFT REPLY</div>
+        <div class="step-card" id="step4Content"><div class="thinking"><div class="spinner"></div>Drafting personalized response…</div></div>
+      </div>
+    </div>
+    <button class="reset-btn" id="resetBtn" style="display:none;" onclick="resetAll()">← Analyze another message</button>
+  </div>
+</div>
+
+<script>
+// ================================================================
+//  PASTE YOUR GEMINI API KEY BELOW (between the quotes)
+//  Get a free key at: https://aistudio.google.com/app/apikey
+// ================================================================
+var GEMINI_API_KEY = AIzaSyCbx12kfpQGbEUMDVtdQkQFnrADawF4Fow;
+// ================================================================
+
+var examples = [
+  "I've been waiting 3 weeks for my refund and nobody is responding to my emails!! I ordered a laptop on March 5th (order #ORD-88271) and returned it on March 9th. Your policy says 5-7 business days. I am absolutely furious and if this isn't resolved TODAY I'm filing a chargeback and leaving a 1-star review everywhere.",
+  "Hi, I've been trying to connect my account to Slack but keep getting error code 403 every time I click Authorize. I'm on the Business plan, MacOS 14.3, using Chrome. I've cleared cache, tried Firefox, and even a different laptop — same result. This is blocking my whole team from collaborating.",
+  "Hey! I'm currently on the Starter plan and loving it. My team has grown from 3 to 11 people this quarter. Can you walk me through what's included in Pro vs Business, and whether there are any annual billing discounts? Happy to jump on a call.",
+  "Just wanted to say your product has genuinely changed how our team works. One small thing: is there a way to export reports as PDF? I can only see CSV export right now. Not urgent at all, just would be a nice addition!"
+];
+
+function loadExample(i) {
+  document.getElementById('msgInput').value = examples[i];
+  updateCount();
+}
+
+function updateCount() {
+  document.getElementById('charCount').textContent = document.getElementById('msgInput').value.length + ' chars';
+}
+
+function show(id) {
+  var el = document.getElementById(id);
+  el.style.display = 'flex';
+  void el.offsetWidth;
+}
+
+// Check key on load
+document.addEventListener('DOMContentLoaded', function() {
+  var banner = document.getElementById('keyBanner');
+  if (GEMINI_API_KEY && GEMINI_API_KEY !== "AIzaSyCbx12kfpQGbEUMDVtdQkQFnrADawF4Fow") {
+    banner.className = 'key-banner ok';
+    banner.innerHTML = '✓ <span>Gemini API key loaded — ready to analyze</span>';
+  }
+});
+
+async function callGemini(systemPrompt, userMessage) {
+  var key = GEMINI_API_KEY;
+  if (!key || key === AIzaSyCbx12kfpQGbEUMDVtdQkQFnrADawF4Fow) {
+    throw new Error('No API key. Open this file in a text editor and paste your Gemini key where it says PASTE_YOUR_KEY_HERE');
+  }
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + key;
+  var response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      system_instruction: { parts: [{ text: systemPrompt }] },
+      contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: 1000 }
+    })
+  });
+  if (!response.ok) {
+    var err = await response.json();
+    throw new Error(err && err.error ? err.error.message : 'Gemini API error ' + response.status);
+  }
+  var data = await response.json();
+  return data.candidates[0].content.parts[0].text;
+}
+
+async function runTriage() {
+  var msg = document.getElementById('msgInput').value.trim();
+  if (!msg) return;
+
+  var btn = document.getElementById('analyzeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>Working…';
+
+  document.getElementById('pipeline').classList.add('visible');
+  document.getElementById('step1Content').textContent = msg;
+  show('step2');
+
+  var triageData;
+  try {
+    var raw = await callGemini(
+      'You are a customer support triage agent. Analyze the message and respond ONLY with a valid JSON object — no markdown, no backticks, no extra text. Use exactly these keys:\n{\n  "sentiment": "Negative" or "Neutral" or "Positive",\n  "sentiment_score": number 1-10,\n  "urgency": "Critical" or "High" or "Medium" or "Low",\n  "intent": "short phrase max 8 words",\n  "key_issues": ["issue1", "issue2"],\n  "department": "Refunds" or "Tech Support" or "Sales" or "General Support",\n  "routing_reason": "one sentence explaining why",\n  "customer_tone": "one word adjective"\n}',
+      msg
+    );
+    var cleaned = raw.replace(/```json/g,'').replace(/```/g,'').trim();
+    triageData = JSON.parse(cleaned);
+  } catch(e) {
+    document.getElementById('step2Content').innerHTML = '<div class="error-box">❌ Analysis failed<br><br>' + e.message + '</div>';
+    btn.disabled = false;
+    btn.innerHTML = '<span>Analyze</span><span>→</span>';
+    return;
+  }
+
+  var sentColor = triageData.sentiment === 'Negative' ? 'var(--red)' : triageData.sentiment === 'Positive' ? 'var(--accent)' : 'var(--amber)';
+  var urgColors = { Critical:'var(--red)', High:'var(--amber)', Medium:'var(--blue)', Low:'var(--accent)' };
+  var filledBars = Math.round((triageData.sentiment_score / 10) * 5);
+  var barType = triageData.sentiment === 'Negative' ? 'filled-negative' : triageData.sentiment === 'Positive' ? 'filled-positive' : 'filled-neutral';
+  var bars = '';
+  for (var i = 0; i < 5; i++) { bars += '<div class="bar-seg ' + (i < filledBars ? barType : '') + '"></div>'; }
+  var issues = (triageData.key_issues || []).map(function(k) {
+    return '<span style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:2px 8px;margin:2px;display:inline-block;color:var(--text)">' + k + '</span>';
+  }).join('');
+
+  document.getElementById('step2Content').innerHTML =
+    '<div class="result-grid">' +
+      '<div class="metric"><div class="metric-label">Sentiment</div><div class="metric-value" style="color:' + sentColor + '">' + triageData.sentiment + ' <span style="font-size:12px;color:var(--muted);font-family:\'DM Mono\',monospace;">' + (triageData.customer_tone||'') + '</span></div><div class="sentiment-bar">' + bars + '</div></div>' +
+      '<div class="metric"><div class="metric-label">Urgency</div><div class="metric-value" style="color:' + (urgColors[triageData.urgency]||'var(--text)') + '">' + triageData.urgency + '</div></div>' +
+      '<div class="metric" style="grid-column:span 2"><div class="metric-label">Intent</div><div class="metric-value" style="font-size:14px;color:var(--text)">' + triageData.intent + '</div></div>' +
+    '</div>' +
+    '<div style="margin-top:12px;font-size:13px;color:var(--muted)">Key issues: ' + issues + '</div>';
+
+  show('step3');
+  await new Promise(function(r){ setTimeout(r, 500); });
+
+  var deptMap = { 'Refunds': ['dept-refunds','💳'], 'Tech Support': ['dept-tech','🔧'], 'Sales': ['dept-sales','📈'], 'General Support': ['dept-general','💬'] };
+  var dept = deptMap[triageData.department] || ['dept-general','💬'];
+  document.getElementById('step3Content').innerHTML =
+    '<div class="dept-badge ' + dept[0] + '">' + dept[1] + ' ' + triageData.department + '</div>' +
+    '<div style="font-size:13px;color:var(--muted);line-height:1.6">' + triageData.routing_reason + '</div>';
+
+  show('step4');
+  try {
+    var draft = await callGemini(
+      'You are a ' + triageData.department + ' specialist. The customer is ' + triageData.customer_tone + ' and urgency is ' + triageData.urgency + '. Write a warm, professional, empathetic reply directly addressing their concern. Be concise (3-5 sentences). No placeholders like [Name]. No subject line — just the reply body.',
+      msg
+    );
+    document.getElementById('step4Content').innerHTML = '<div class="draft-box">' + draft + '</div>';
+  } catch(e) {
+    document.getElementById('step4Content').innerHTML = '<div class="error-box">❌ Draft failed: ' + e.message + '</div>';
+  }
+
+  document.getElementById('resetBtn').style.display = 'block';
+  btn.disabled = false;
+  btn.innerHTML = '<span>Analyze</span><span>→</span>';
+}
+
+function resetAll() {
+  document.getElementById('pipeline').classList.remove('visible');
+  document.getElementById('msgInput').value = '';
+  document.getElementById('charCount').textContent = '0 chars';
+  ['step2','step3','step4'].forEach(function(id){ document.getElementById(id).style.display='none'; });
+  document.getElementById('resetBtn').style.display = 'none';
+  document.getElementById('step2Content').innerHTML = '<div class="thinking"><div class="spinner"></div>Analyzing sentiment, urgency & intent…</div>';
+  document.getElementById('step3Content').innerHTML = '<div class="thinking"><div class="spinner"></div>Routing to best-fit department…</div>';
+  document.getElementById('step4Content').innerHTML = '<div class="thinking"><div class="spinner"></div>Drafting personalized response…</div>';
+}
+</script>
+</body>
+</html>
